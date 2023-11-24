@@ -125,14 +125,15 @@ func (j jwtParser) ToParser() Parser {
 				if token == "" {
 					return nil, errors.New("empty jwt token")
 				}
-				jwtToken, err := jwt.ParseWithClaims(token, j.NewClaimsFunc(ctx), j.KeyFunc)
+				claims := j.NewClaimsFunc(ctx)
+				jwtToken, err := jwt.ParseWithClaims(token, claims, j.KeyFunc)
 				if err != nil {
 					return nil, errors.Mark(err, errParseToken)
 				}
 				if !jwtToken.Valid {
 					return nil, errors.New("invalid jwt token")
 				}
-				return jwtToken.Claims, nil
+				return claims, nil
 			}
 		}
 		return nil, nil
