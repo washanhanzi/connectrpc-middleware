@@ -3,12 +3,24 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"net/textproto"
 	"strings"
 
-	"connectrpc.com/connect"
 	"github.com/cockroachdb/errors"
 )
+
+type ExtractedHeader map[string][]string
+
+func newExtractedHeader(capacity int) ExtractedHeader {
+	return make(map[string][]string, capacity)
+}
+
+func (h ExtractedHeader) Set(key string, values []string) {
+	h[key] = values
+}
+
+func (h ExtractedHeader) Get(key string) []string {
+	return h[key]
+}
 
 type HeaderExtractor struct {
 	configs []LookupConfig
@@ -86,63 +98,32 @@ func DefaultBasicExtractor() HeaderExtractor {
 	}
 }
 
-func (e HeaderExtractor) ToUnaryExtractor() Extractor[connect.AnyRequest] {
-	return func(ctx context.Context, req connect.AnyRequest) (map[string][]string, error) {
-		valuesMap := make(map[string][]string, len(e.configs))
+func (e HeaderExtractor) ToExtractor() Extractor {
+	return func(ctx context.Context, req *Request) (ExtractedHeader, error) {
+		extracted := newExtractedHeader(len(e.configs))
 		var lastErr error
 		for _, c := range e.configs {
 			switch c.Source {
 			case TokenSourceHeader:
-				header := textproto.CanonicalMIMEHeaderKey(c.Name)
-				values := req.Header().Values(header)
-				values, err := ValuesFromHeader(values, c.CutPrefix)
+				values := req.Header.Values(c.Name)
+				extractedValues, err := ValuesFromHeader(values, c.CutPrefix)
 				if err != nil {
 					lastErr = err
 				}
-				valuesMap[c.Name] = values
+				extracted.Set(c.Name, extractedValues)
 			case TokenSourceCookie:
-				cookiesRaw := req.Header().Get("cookie")
+				cookiesRaw := req.Header.Get(string(TokenSourceCookie))
 				values, err := ValuesFromCookie(c.Name, cookiesRaw)
 				if err != nil {
 					lastErr = err
 				}
-				valuesMap[c.Name] = values
+				extracted.Set(c.Name, values)
 			}
 		}
-		if len(valuesMap) == 0 {
+		if len(extracted) == 0 {
 			return nil, lastErr
 		}
-		return valuesMap, nil
-	}
-}
-
-func (e HeaderExtractor) ToStreamExtractor() Extractor[connect.StreamingHandlerConn] {
-	return func(ctx context.Context, conn connect.StreamingHandlerConn) (map[string][]string, error) {
-		valuesMap := make(map[string][]string, len(e.configs))
-		var lastErr error
-		for _, c := range e.configs {
-			switch c.Source {
-			case TokenSourceHeader:
-				header := textproto.CanonicalMIMEHeaderKey(c.Name)
-				values := conn.RequestHeader().Values(header)
-				values, err := ValuesFromHeader(values, c.CutPrefix)
-				if err != nil {
-					lastErr = err
-				}
-				valuesMap[c.Name] = values
-			case TokenSourceCookie:
-				cookiesRaw := conn.RequestHeader().Get("cookie")
-				values, err := ValuesFromCookie(c.Name, cookiesRaw)
-				if err != nil {
-					lastErr = err
-				}
-				valuesMap[c.Name] = values
-			}
-		}
-		if len(valuesMap) == 0 {
-			return nil, lastErr
-		}
-		return valuesMap, nil
+		return extracted, nil
 	}
 }
 
@@ -156,19 +137,19 @@ var errHeaderExtractorValueInvalid = errors.New("invalid value in request header
 // is `Basic `. In case of JWT tokens `Authorization: Bearer <token>` prefix is `Bearer `.
 // If prefix is left empty the whole value is returned.
 func ValuesFromHeader(values []string, valuePrefix string) ([]string, error) {
-	prefixLen := len(valuePrefix)
 	if len(values) == 0 {
 		return nil, errHeaderExtractorValueMissing
 	}
 
+	if len(valuePrefix) == 0 {
+		return values, nil
+	}
+
+	prefixLen := len(valuePrefix)
 	result := make([]string, 0, len(values))
 	for i, value := range values {
 		if i >= extractorLimit {
 			break
-		}
-		if prefixLen == 0 {
-			result = append(result, value)
-			continue
 		}
 		if len(value) > prefixLen && strings.EqualFold(value[:prefixLen], valuePrefix) {
 			result = append(result, value[prefixLen:])
@@ -176,10 +157,7 @@ func ValuesFromHeader(values []string, valuePrefix string) ([]string, error) {
 	}
 
 	if len(result) == 0 {
-		if prefixLen > 0 {
-			return nil, errHeaderExtractorValueInvalid
-		}
-		return nil, errHeaderExtractorValueMissing
+		return nil, errHeaderExtractorValueInvalid
 	}
 	return result, nil
 }
@@ -189,7 +167,6 @@ func FromRawCookies(rawCookies string) []*http.Cookie {
 	header := http.Header{}
 	header.Add("Cookie", rawCookies)
 	request := http.Request{Header: header}
-
 	return request.Cookies()
 }
 

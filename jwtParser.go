@@ -66,7 +66,11 @@ func NewJWTParser(opts ...jwtParserOpt) (jwtParser, error) {
 	}
 
 	if p.KeyFunc == nil {
-		p.KeyFunc = p.defaultKeyFunc
+		if len(p.SigningKeys) != 0 {
+			p.KeyFunc = p.defaultKeyFuncForSigningKeys
+			return p, nil
+		}
+		p.KeyFunc = p.defaultKeyFuncForSigningKey
 	}
 	return p, nil
 }
@@ -83,7 +87,7 @@ func WithJWTMapClaims(signingKey any) jwtParserOpt {
 		p.NewClaimsFunc = func(context.Context) jwt.Claims {
 			return jwt.MapClaims{}
 		}
-		p.KeyFunc = p.defaultKeyFunc
+		p.KeyFunc = p.defaultKeyFuncForSigningKeys
 	}
 }
 
@@ -119,16 +123,16 @@ func WithKeyFunc(keyFunc jwt.Keyfunc) jwtParserOpt {
 }
 
 func (j jwtParser) ToParser() Parser {
-	return func(ctx context.Context, tokensMap map[string][]string) (any, error) {
-		for _, tokens := range tokensMap {
-			for _, token := range tokens {
-				if token == "" {
+	return func(ctx context.Context, extractedHeader ExtractedHeader) (any, error) {
+		for _, values := range extractedHeader {
+			for _, v := range values {
+				if v == "" {
 					return nil, errors.New("empty jwt token")
 				}
 				claims := j.NewClaimsFunc(ctx)
-				jwtToken, err := jwt.ParseWithClaims(token, claims, j.KeyFunc)
+				jwtToken, err := jwt.ParseWithClaims(v, claims, j.KeyFunc)
 				if err != nil {
-					return nil, errors.Mark(err, errParseToken)
+					return nil, err
 				}
 				if !jwtToken.Valid {
 					return nil, errors.New("invalid jwt token")
@@ -140,15 +144,26 @@ func (j jwtParser) ToParser() Parser {
 	}
 }
 
-// defaultKeyFunc creates JWTGo implementation for KeyFunc.
+func (j jwtParser) ParserJWT(token string, claims jwt.Claims) error {
+	if token == "" {
+		return errors.New("empty jwt token")
+	}
+	jwtToken, err := jwt.ParseWithClaims(token, claims, j.KeyFunc)
+	if err != nil {
+		return err
+	}
+	if !jwtToken.Valid {
+		return errors.New("invalid jwt token")
+	}
+	return nil
+}
+
+// defaultKeyFuncForSigningKeys creates JWTGo implementation for KeyFunc.
 //
 // error returns TokenError.
-func (j jwtParser) defaultKeyFunc(token *jwt.Token) (any, error) {
+func (j jwtParser) defaultKeyFuncForSigningKeys(token *jwt.Token) (any, error) {
 	if token.Method.Alg() != j.SigningMethod {
 		return nil, errors.Newf("unexpected jwt signing method=%v", token.Header["alg"])
-	}
-	if len(j.SigningKeys) == 0 {
-		return j.SigningKey, nil
 	}
 
 	if kid, ok := token.Header["kid"].(string); ok {
@@ -157,4 +172,11 @@ func (j jwtParser) defaultKeyFunc(token *jwt.Token) (any, error) {
 		}
 	}
 	return nil, errors.Newf("unexpected jwt key id=%v", token.Header["kid"])
+}
+
+func (j jwtParser) defaultKeyFuncForSigningKey(token *jwt.Token) (any, error) {
+	if token.Method.Alg() != j.SigningMethod {
+		return nil, errors.Newf("unexpected jwt signing method=%v", token.Header["alg"])
+	}
+	return j.SigningKey, nil
 }

@@ -144,3 +144,4 @@ used with caution, still in development
 
 - [echo-jwt](https://github.com/labstack/echo-jwt)
 - [connectrpc](https://github.com/connectrpc/connect-go)
+- [connectauth](https://github.com/akshayjshah/connectauth)

@@ -2,121 +2,83 @@ package middleware
 
 import (
 	"context"
-	"reflect"
+	"net/http"
 	"testing"
 
-	"connectrpc.com/connect"
 	"github.com/test-go/testify/assert"
-	pingv1 "github.com/washanhanzi/connectrpc-middleware/example/gen/ping/v1"
 )
 
 type headerValuesTest struct {
-	Case      string
-	GotReq    func() *connect.Request[pingv1.PingRequest]
-	Extractor func(*testing.T) HeaderExtractor
-	Want      map[string][]string
-	Err       string
+	Case         string
+	Header       map[string]string
+	Configs      []LookupConfig
+	ConstructErr string
+	Want         map[string][]string
+	Err          string
 }
 
 var headerValuesTests = []headerValuesTest{
+	//TODO invalid source name
 	{
-		Case: "invalid header",
-		GotReq: func() *connect.Request[pingv1.PingRequest] {
-			return connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
-		},
-		Extractor: func(t *testing.T) HeaderExtractor { return DefaultBasicExtractor() },
-		Err:       errHeaderExtractorValueMissing.Error(),
+		Case:    "invalid header",
+		Configs: []LookupConfig{{Source: "header", Name: "Authorization"}},
+		Err:     errHeaderExtractorValueMissing.Error(),
 	},
 	{
-		Case: "empty header",
-		GotReq: func() *connect.Request[pingv1.PingRequest] {
-			return connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
-		},
-		Extractor: func(t *testing.T) HeaderExtractor { return DefaultBasicExtractor() },
-		Err:       errHeaderExtractorValueMissing.Error(),
+		Case:    "empty header",
+		Configs: []LookupConfig{{Source: "header", Name: "Authorization"}},
+		Err:     errHeaderExtractorValueMissing.Error(),
 	},
 	{
-		Case: "empty prefix",
-		GotReq: func() *connect.Request[pingv1.PingRequest] {
-			req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
-			req.Header().Set("Authorization", "xxxx")
-			return req
-		},
-		Extractor: func(t *testing.T) HeaderExtractor {
-			ex, _ := NewHeaderExtractor(WithLookupConfig("header", "Authorization", ""))
-			return ex
-		},
+		Case:    "empty prefix",
+		Header:  map[string]string{"Authorization": "xxxx"},
+		Configs: []LookupConfig{{Source: "header", Name: "Authorization"}},
 		Want: map[string][]string{
 			"Authorization": {"xxxx"},
 		},
 	},
 	{
-		Case: "custom schema",
-		GotReq: func() *connect.Request[pingv1.PingRequest] {
-			req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
-			req.Header().Set("Authorization", "test xxxx")
-			return req
-		},
-		Extractor: func(t *testing.T) HeaderExtractor {
-			ee, err := NewHeaderExtractor(WithLookupConfig(string(TokenSourceHeader), HeaderAuthorization, "test "))
-			assert.Nil(t, err)
-			return ee
-		},
+		Case:    "custom schema",
+		Header:  map[string]string{"Authorization": "test xxxx"},
+		Configs: []LookupConfig{{Source: "header", Name: "Authorization", CutPrefix: "test "}},
 		Want: map[string][]string{
 			"Authorization": {"xxxx"},
 		},
 	},
 	{
-		Case: "basic auth",
-		GotReq: func() *connect.Request[pingv1.PingRequest] {
-			req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
-			req.Header().Set("Authorization", "basic xxxx")
-			return req
-		},
-		Extractor: func(t *testing.T) HeaderExtractor { return DefaultBasicExtractor() },
+		Case:    "basic auth",
+		Header:  map[string]string{"Authorization": "basic xxxx"},
+		Configs: []LookupConfig{{Source: "header", Name: "Authorization", CutPrefix: "basic "}},
 		Want: map[string][]string{
 			"Authorization": {"xxxx"},
 		},
 	},
 	{
-		Case: "bearer auth",
-		GotReq: func() *connect.Request[pingv1.PingRequest] {
-			req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
-			req.Header().Set("Authorization", "bearer xxxx")
-			return req
-		},
-		Extractor: func(t *testing.T) HeaderExtractor { return DefaultBearerTokenExtractor() },
+		Case:    "bearer auth",
+		Header:  map[string]string{"Authorization": "bearer xxxx"},
+		Configs: []LookupConfig{{Source: "header", Name: "Authorization", CutPrefix: "bearer "}},
 		Want: map[string][]string{
 			"Authorization": {"xxxx"},
 		},
 	},
 	{
-		Case: "case insentive",
-		GotReq: func() *connect.Request[pingv1.PingRequest] {
-			req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
-			req.Header().Set("Authorization", "bearer xxxx")
-			return req
-		},
-		Extractor: func(t *testing.T) HeaderExtractor { return DefaultBearerTokenExtractor() },
+		Case:    "case insentive",
+		Header:  map[string]string{"Authorization": "BeaRer xxxx"},
+		Configs: []LookupConfig{{Source: "header", Name: "Authorization", CutPrefix: "bearer "}},
 		Want: map[string][]string{
 			"Authorization": {"xxxx"},
 		},
 	},
+	//TODO config case insensitive
 	{
 		Case: "multiple values",
-		GotReq: func() *connect.Request[pingv1.PingRequest] {
-			req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
-			req.Header().Set("Authorization", "bearer xxxx")
-			req.Header().Set("user-name", "John Doe")
-			return req
+		Header: map[string]string{
+			"Authorization": "BeaRer xxxx",
+			"user-name":     "John Doe",
 		},
-		Extractor: func(t *testing.T) HeaderExtractor {
-			ee, err := NewHeaderExtractor(
-				WithLookupConfig("header", "Authorization", "bearer "),
-				WithLookupConfig("header", "user-name", ""),
-			)
-			assert.Nil(t, err)
-			return ee
+		Configs: []LookupConfig{
+			{Source: "header", Name: "Authorization", CutPrefix: "bearer "},
+			{Source: "header", Name: "user-name", CutPrefix: ""},
 		},
 		Want: map[string][]string{
 			"Authorization": {"xxxx"},
@@ -129,16 +91,27 @@ func TestValuesFromHeader(t *testing.T) {
 	t.Parallel()
 	for _, test := range headerValuesTests {
 		t.Run(test.Case, func(t *testing.T) {
-			u := test.Extractor(t).ToUnaryExtractor()
-			result, err := u(context.Background(), test.GotReq())
+			headerExtractor, err := NewHeaderExtractor(WithLookupConfigs(test.Configs...))
+			if test.ConstructErr == "" {
+				assert.Nil(t, err)
+			} else {
+				assert.EqualError(t, err, test.ConstructErr)
+			}
+			extracor := headerExtractor.ToExtractor()
+			headers := http.Header{}
+			for k, v := range test.Header {
+				headers.Add(k, v)
+			}
+			result, err := extracor(context.Background(), &Request{Header: headers})
 			if err != nil {
 				if !assert.EqualError(t, err, test.Err) {
 					t.Errorf("case: %v, expected error %v, got error %v", test.Case, test.Err, err)
 				}
 			}
-
-			if test.Want != nil && !reflect.DeepEqual(result, test.Want) {
-				t.Errorf("case: %v, expected result %v, got %v", test.Case, test.Want, result)
+			if len(test.Want) != 0 {
+				for k, v := range test.Want {
+					assert.EqualValues(t, v, result[k])
+				}
 			}
 		})
 	}

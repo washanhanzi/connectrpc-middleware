@@ -32,7 +32,7 @@ var unaryAuthTests = []struct {
 	{
 		Case: "skip",
 		Interceptor: func(t *testing.T) connect.Interceptor {
-			interceptor, err := NewAuthInterceptor(WithDefaultBearerExtractorAndParser([]byte("secret")), WithSkipUnary())
+			interceptor, err := NewAuthInterceptor(WithDefaultBearerExtractorAndParser([]byte("secret")))
 			assert.Nil(t, err)
 			return interceptor
 		},
@@ -53,7 +53,7 @@ var unaryAuthTests = []struct {
 	{
 		Case: "ignore error",
 		Interceptor: func(t *testing.T) connect.Interceptor {
-			interceptor, err := NewAuthInterceptor(WithDefaultBearerExtractorAndParser([]byte("secret")), WithIgnoreUnaryError())
+			interceptor, err := NewAuthInterceptor(WithDefaultBearerExtractorAndParser([]byte("secret")), WithIgnoreError())
 			assert.Nil(t, err)
 			return interceptor
 		},
@@ -164,7 +164,7 @@ var unaryAuthTests = []struct {
 		Case: "custom claim",
 		Interceptor: func(t *testing.T) connect.Interceptor {
 			interceptor, err := NewAuthInterceptor(
-				WithDefaultBearerExtractor(false),
+				WithDefaultBearerExtractor(),
 				WithCustomJWTClaimsParser([]byte("secret"), func(ctx context.Context) jwt.Claims {
 					return &jwtCustomClaims{}
 				}),
@@ -196,11 +196,14 @@ var unaryAuthTests = []struct {
 				WithLookupConfig("header", "user-id", ""),
 			)
 			assert.Nil(t, err)
-			parser := func(ctx context.Context, tokensMap map[string][]string) (any, error) {
+			parser := func(ctx context.Context, tokensMap ExtractedHeader) (any, error) {
 				payload := customPayload{}
 				claims := jwtCustomClaims{}
 				if tokens, ok := tokensMap["Authorization"]; ok {
 					for _, token := range tokens {
+						if token == "" {
+							continue
+						}
 						jwtToken, err := jwt.ParseWithClaims(token,
 							&claims,
 							func(token *jwt.Token) (any, error) {
@@ -223,7 +226,7 @@ var unaryAuthTests = []struct {
 				return payload, nil
 			}
 			interceptor, err := NewAuthInterceptor(
-				WithUnaryExtractor(extractor.ToUnaryExtractor()),
+				WithExtractor(extractor.ToExtractor()),
 				WithParser(parser),
 			)
 			assert.Nil(t, err)
