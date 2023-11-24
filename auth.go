@@ -44,10 +44,11 @@ type (
 	Extractor's signature take advantage of connect unary and streaming handler has similar function parameters
 	which are `func[R connect.AnyRequest](ctx context.Context, req R) <return values>` and
 	`func[R connect.StreamingHandlerConn](ctx context.Context, conn R) <return values>`
+	The returned map contain all the information extracted from the request(normally the header), is a map of headerName->[]headerValues
 	*/
-	Extractor[R any] func(context.Context, R) ([]string, error)
-	//Parser is used to parse token from Extractor
-	Parser func(ctx context.Context, token string) (any, error)
+	Extractor[R any] func(context.Context, R) (map[string][]string, error)
+	//Parser is used to parse tokens from Extractor
+	Parser func(ctx context.Context, tokensMap map[string][]string) (any, error)
 	//ClientTokenGetter is used to get token for client request
 	ClientTokenGetter interface {
 		Get() (string, string)
@@ -369,27 +370,26 @@ func extractAndParse[R any](ctx context.Context, req R, p Parser, h *AuthHandler
 	}
 
 	var extractErr error
-	var lastParseErr error
+	var parseErr error
 	tokens, err := h.Extractor(ctx, req)
 	if err != nil {
 		extractErr = errors.Mark(err, errExtractToken)
 	}
-	for _, t := range tokens {
-		payload, err := p(ctx, t)
-		if err != nil {
-			lastParseErr = errors.Mark(err, errParseToken)
-			continue
+	if len(tokens) != 0 {
+		payload, err := p(ctx, tokens)
+		if err == nil {
+			ctx = context.WithValue(ctx, contextKey, payload)
+			if h.SuccessFunc != nil {
+				h.SuccessFunc(ctx, req)
+			}
+			return ctx, req, nil
 		}
-		ctx = context.WithValue(ctx, contextKey, payload)
-		if h.SuccessFunc != nil {
-			h.SuccessFunc(ctx, req)
-		}
-		return ctx, req, nil
+		parseErr = errors.Mark(err, errParseToken)
 	}
 
 	// prioritize token parsing errors over extracting errors as parsing is occurs further in process, meaning we managed to
 	// extract at least one token and failed to parse it
-	joinErr := errors.Join(lastParseErr, extractErr)
+	joinErr := errors.Join(parseErr, extractErr)
 	if h.ErrorHandler != nil {
 		tmpErr := h.ErrorHandler(ctx, req, joinErr)
 		if tmpErr == nil {
@@ -397,7 +397,7 @@ func extractAndParse[R any](ctx context.Context, req R, p Parser, h *AuthHandler
 		}
 		return ctx, req, tmpErr
 	}
-	if lastParseErr != nil {
+	if parseErr != nil {
 		return ctx, req, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid or expired token"))
 	}
 	return ctx, req, connect.NewError(connect.CodeUnauthenticated, errors.New("missing or malformed token"))

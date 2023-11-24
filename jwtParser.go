@@ -119,18 +119,23 @@ func WithKeyFunc(keyFunc jwt.Keyfunc) jwtParserOpt {
 }
 
 func (j jwtParser) ToParser() Parser {
-	return func(ctx context.Context, token string) (any, error) {
-		if token == "" {
-			return nil, errors.New("empty jwt token")
+	return func(ctx context.Context, tokensMap map[string][]string) (any, error) {
+		for _, tokens := range tokensMap {
+			for _, token := range tokens {
+				if token == "" {
+					return nil, errors.New("empty jwt token")
+				}
+				jwtToken, err := jwt.ParseWithClaims(token, j.NewClaimsFunc(ctx), j.KeyFunc)
+				if err != nil {
+					return nil, errors.Mark(err, errParseToken)
+				}
+				if !jwtToken.Valid {
+					return nil, errors.New("invalid jwt token")
+				}
+				return jwtToken.Claims, nil
+			}
 		}
-		jwtToken, err := jwt.ParseWithClaims(token, j.NewClaimsFunc(ctx), j.KeyFunc)
-		if err != nil {
-			return nil, errors.Mark(err, errParseToken)
-		}
-		if !jwtToken.Valid {
-			return nil, errors.New("invalid jwt token")
-		}
-		return jwtToken.Claims, nil
+		return nil, nil
 	}
 }
 

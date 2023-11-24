@@ -17,6 +17,11 @@ type jwtCustomClaims struct {
 	jwtCustomInfo
 }
 
+type customPayload struct {
+	jwtCustomInfo
+	UserId string
+}
+
 var unaryAuthTests = []struct {
 	Case        string
 	Interceptor func(t *testing.T) connect.Interceptor
@@ -174,8 +179,67 @@ var unaryAuthTests = []struct {
 		},
 		Handler: func(t *testing.T) connect.UnaryFunc {
 			return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-				claims, ok := FromContext[customClaims](ctx)
+				claims, ok := FromContext[*jwtCustomClaims](ctx)
 				assert.True(t, ok)
+				assert.Equal(t, claims.RegisteredClaims.Subject, "1234567890")
+				assert.Equal(t, claims.jwtCustomInfo.Name, "John Doe")
+				assert.Equal(t, claims.jwtCustomInfo.Admin, true)
+				return nil, nil
+			}
+		},
+	},
+	{
+		Case: "custom payload",
+		Interceptor: func(t *testing.T) connect.Interceptor {
+			extractor, err := NewHeaderExtractor(
+				WithLookupConfig("header", "Authorization", "bearer "),
+				WithLookupConfig("header", "user-id", ""),
+			)
+			assert.Nil(t, err)
+			parser := func(ctx context.Context, tokensMap map[string][]string) (any, error) {
+				payload := customPayload{}
+				claims := jwtCustomClaims{}
+				if tokens, ok := tokensMap["Authorization"]; ok {
+					for _, token := range tokens {
+						jwtToken, err := jwt.ParseWithClaims(token,
+							&claims,
+							func(token *jwt.Token) (any, error) {
+								return []byte("secret"), nil
+							})
+						if err != nil {
+							return payload, err
+						}
+						if !jwtToken.Valid {
+							return payload, errors.New("invalid jwt token")
+						}
+						payload.jwtCustomInfo = claims.jwtCustomInfo
+					}
+				}
+				if userIds, ok := tokensMap["user-id"]; ok {
+					if len(userIds) != 0 {
+						payload.UserId = userIds[0]
+					}
+				}
+				return payload, nil
+			}
+			interceptor, err := NewAuthInterceptor(
+				WithUnaryExtractor(extractor.ToUnaryExtractor()),
+				WithParser(parser),
+			)
+			assert.Nil(t, err)
+			return interceptor
+		},
+		Request: func() *connect.Request[pingv1.PingRequest] {
+			req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
+			req.Header().Set(HeaderAuthorization, validAuth)
+			req.Header().Set("user-id", "1234567890")
+			return req
+		},
+		Handler: func(t *testing.T) connect.UnaryFunc {
+			return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+				claims, ok := FromContext[customPayload](ctx)
+				assert.True(t, ok)
+				assert.Equal(t, claims.UserId, "1234567890")
 				assert.Equal(t, claims.jwtCustomInfo.Name, "John Doe")
 				assert.Equal(t, claims.jwtCustomInfo.Admin, true)
 				return nil, nil

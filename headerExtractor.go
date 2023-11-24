@@ -87,36 +87,62 @@ func DefaultBasicExtractor() HeaderExtractor {
 }
 
 func (e HeaderExtractor) ToUnaryExtractor() Extractor[connect.AnyRequest] {
-	return func(ctx context.Context, req connect.AnyRequest) ([]string, error) {
+	return func(ctx context.Context, req connect.AnyRequest) (map[string][]string, error) {
+		valuesMap := make(map[string][]string, len(e.configs))
+		var lastErr error
 		for _, c := range e.configs {
 			switch c.Source {
 			case TokenSourceHeader:
 				header := textproto.CanonicalMIMEHeaderKey(c.Name)
 				values := req.Header().Values(header)
-				return ValuesFromHeader(values, c.CutPrefix)
+				values, err := ValuesFromHeader(values, c.CutPrefix)
+				if err != nil {
+					lastErr = err
+				}
+				valuesMap[c.Name] = values
 			case TokenSourceCookie:
 				cookiesRaw := req.Header().Get("cookie")
-				return ValuesFromCookie(c.Name, cookiesRaw)
+				values, err := ValuesFromCookie(c.Name, cookiesRaw)
+				if err != nil {
+					lastErr = err
+				}
+				valuesMap[c.Name] = values
 			}
 		}
-		return nil, nil
+		if len(valuesMap) == 0 {
+			return nil, lastErr
+		}
+		return valuesMap, nil
 	}
 }
 
 func (e HeaderExtractor) ToStreamExtractor() Extractor[connect.StreamingHandlerConn] {
-	return func(ctx context.Context, conn connect.StreamingHandlerConn) ([]string, error) {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) (map[string][]string, error) {
+		valuesMap := make(map[string][]string, len(e.configs))
+		var lastErr error
 		for _, c := range e.configs {
 			switch c.Source {
 			case TokenSourceHeader:
 				header := textproto.CanonicalMIMEHeaderKey(c.Name)
 				values := conn.RequestHeader().Values(header)
-				return ValuesFromHeader(values, c.CutPrefix)
+				values, err := ValuesFromHeader(values, c.CutPrefix)
+				if err != nil {
+					lastErr = err
+				}
+				valuesMap[c.Name] = values
 			case TokenSourceCookie:
 				cookiesRaw := conn.RequestHeader().Get("cookie")
-				return ValuesFromCookie(c.Name, cookiesRaw)
+				values, err := ValuesFromCookie(c.Name, cookiesRaw)
+				if err != nil {
+					lastErr = err
+				}
+				valuesMap[c.Name] = values
 			}
 		}
-		return nil, nil
+		if len(valuesMap) == 0 {
+			return nil, lastErr
+		}
+		return valuesMap, nil
 	}
 }
 

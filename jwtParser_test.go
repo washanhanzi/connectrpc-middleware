@@ -29,7 +29,7 @@ var jwtParserTests = []struct {
 	Case      string
 	Parser    func(t *testing.T) Parser
 	Validate  func(t *testing.T, payload any)
-	Token     string
+	Token     map[string][]string
 	ParserErr string
 }{
 	{
@@ -55,7 +55,7 @@ var jwtParserTests = []struct {
 			assert.Nil(t, err)
 			return parser.ToParser()
 		},
-		Token:     token,
+		Token:     map[string][]string{"token": {token}},
 		ParserErr: "token is unverifiable: error while executing keyfunc: unexpected jwt signing method=HS256",
 	},
 	{
@@ -65,7 +65,7 @@ var jwtParserTests = []struct {
 			assert.Nil(t, err)
 			return parser.ToParser()
 		},
-		Token:     token,
+		Token:     map[string][]string{"token": {token}},
 		ParserErr: "token signature is invalid: signature is invalid",
 	},
 	{
@@ -75,7 +75,7 @@ var jwtParserTests = []struct {
 			assert.Nil(t, err)
 			return parser.ToParser()
 		},
-		Token:     token,
+		Token:     map[string][]string{"token": {token}},
 		ParserErr: "",
 		Validate: func(t *testing.T, payload any) {
 			assert.Equal(t, "1234567890", payload.(jwt.MapClaims)["sub"])
@@ -90,7 +90,7 @@ var jwtParserTests = []struct {
 			assert.Nil(t, err)
 			return parser.ToParser()
 		},
-		Token:     token,
+		Token:     map[string][]string{"token": {token}},
 		ParserErr: "",
 		Validate: func(t *testing.T, payload any) {
 			assert.Equal(t, "1234567890", payload.(jwt.MapClaims)["sub"])
@@ -109,7 +109,7 @@ var jwtParserTests = []struct {
 			assert.Nil(t, err)
 			return parser.ToParser()
 		},
-		Token:     token,
+		Token:     map[string][]string{"token": {token}},
 		ParserErr: "",
 		Validate: func(t *testing.T, payload any) {
 			assert.Equal(t, "1234567890", payload.(*customClaims).Subject)

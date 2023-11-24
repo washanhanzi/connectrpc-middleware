@@ -14,7 +14,7 @@ type headerValuesTest struct {
 	Case      string
 	GotReq    func() *connect.Request[pingv1.PingRequest]
 	Extractor func(*testing.T) HeaderExtractor
-	Want      []string
+	Want      map[string][]string
 	Err       string
 }
 
@@ -46,7 +46,9 @@ var headerValuesTests = []headerValuesTest{
 			ex, _ := NewHeaderExtractor(WithLookupConfig("header", "Authorization", ""))
 			return ex
 		},
-		Want: []string{"xxxx"},
+		Want: map[string][]string{
+			"Authorization": {"xxxx"},
+		},
 	},
 	{
 		Case: "custom schema",
@@ -60,7 +62,9 @@ var headerValuesTests = []headerValuesTest{
 			assert.Nil(t, err)
 			return ee
 		},
-		Want: []string{"xxxx"},
+		Want: map[string][]string{
+			"Authorization": {"xxxx"},
+		},
 	},
 	{
 		Case: "basic auth",
@@ -70,7 +74,9 @@ var headerValuesTests = []headerValuesTest{
 			return req
 		},
 		Extractor: func(t *testing.T) HeaderExtractor { return DefaultBasicExtractor() },
-		Want:      []string{"xxxx"},
+		Want: map[string][]string{
+			"Authorization": {"xxxx"},
+		},
 	},
 	{
 		Case: "bearer auth",
@@ -80,7 +86,9 @@ var headerValuesTests = []headerValuesTest{
 			return req
 		},
 		Extractor: func(t *testing.T) HeaderExtractor { return DefaultBearerTokenExtractor() },
-		Want:      []string{"xxxx"},
+		Want: map[string][]string{
+			"Authorization": {"xxxx"},
+		},
 	},
 	{
 		Case: "case insentive",
@@ -90,7 +98,30 @@ var headerValuesTests = []headerValuesTest{
 			return req
 		},
 		Extractor: func(t *testing.T) HeaderExtractor { return DefaultBearerTokenExtractor() },
-		Want:      []string{"xxxx"},
+		Want: map[string][]string{
+			"Authorization": {"xxxx"},
+		},
+	},
+	{
+		Case: "multiple values",
+		GotReq: func() *connect.Request[pingv1.PingRequest] {
+			req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
+			req.Header().Set("Authorization", "bearer xxxx")
+			req.Header().Set("user-name", "John Doe")
+			return req
+		},
+		Extractor: func(t *testing.T) HeaderExtractor {
+			ee, err := NewHeaderExtractor(
+				WithLookupConfig("header", "Authorization", "bearer "),
+				WithLookupConfig("header", "user-name", ""),
+			)
+			assert.Nil(t, err)
+			return ee
+		},
+		Want: map[string][]string{
+			"Authorization": {"xxxx"},
+			"user-name":     {"John Doe"},
+		},
 	},
 }
 
@@ -105,7 +136,8 @@ func TestValuesFromHeader(t *testing.T) {
 					t.Errorf("case: %v, expected error %v, got error %v", test.Case, test.Err, err)
 				}
 			}
-			if !reflect.DeepEqual(result, test.Want) {
+
+			if test.Want != nil && !reflect.DeepEqual(result, test.Want) {
 				t.Errorf("case: %v, expected result %v, got %v", test.Case, test.Want, result)
 			}
 		})
