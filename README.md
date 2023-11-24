@@ -1,5 +1,7 @@
 # connectrpc-middleware
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/washanhanzi/connectrpc-middleware#section-readme.svg)](https://pkg.go.dev/github.com/washanhanzi/connectrpc-middleware#section-readme)
+
 ## auth interceptor
 
 used with caution, still in development
