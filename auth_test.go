@@ -27,7 +27,7 @@ var unaryAuthTests = []struct {
 	{
 		Case: "skip",
 		Interceptor: func(t *testing.T) connect.Interceptor {
-			interceptor, err := NewAuthInterceptor(WithDefaultBeearerExtractorAndParser([]byte("secret")), WithSkipUnary())
+			interceptor, err := NewAuthInterceptor(WithDefaultBearerExtractorAndParser([]byte("secret")), WithSkipUnary())
 			assert.Nil(t, err)
 			return interceptor
 		},
@@ -48,7 +48,7 @@ var unaryAuthTests = []struct {
 	{
 		Case: "ignore error",
 		Interceptor: func(t *testing.T) connect.Interceptor {
-			interceptor, err := NewAuthInterceptor(WithDefaultBeearerExtractorAndParser([]byte("secret")), WithIgnoreUnaryError())
+			interceptor, err := NewAuthInterceptor(WithDefaultBearerExtractorAndParser([]byte("secret")), WithIgnoreUnaryError())
 			assert.Nil(t, err)
 			return interceptor
 		},
@@ -69,7 +69,7 @@ var unaryAuthTests = []struct {
 	{
 		Case: "invalid bearer token",
 		Interceptor: func(t *testing.T) connect.Interceptor {
-			interceptor, err := NewAuthInterceptor(WithDefaultBeearerExtractorAndParser([]byte("secret")))
+			interceptor, err := NewAuthInterceptor(WithDefaultBearerExtractorAndParser([]byte("secret")))
 			assert.Nil(t, err)
 			return interceptor
 		},
@@ -91,7 +91,7 @@ var unaryAuthTests = []struct {
 	{
 		Case: "invalid auth header",
 		Interceptor: func(t *testing.T) connect.Interceptor {
-			interceptor, err := NewAuthInterceptor(WithDefaultBeearerExtractorAndParser([]byte("secret")))
+			interceptor, err := NewAuthInterceptor(WithDefaultBearerExtractorAndParser([]byte("secret")))
 			assert.Nil(t, err)
 			return interceptor
 		},
@@ -113,7 +113,7 @@ var unaryAuthTests = []struct {
 	{
 		Case: "invalid signing key",
 		Interceptor: func(t *testing.T) connect.Interceptor {
-			interceptor, err := NewAuthInterceptor(WithDefaultBeearerExtractorAndParser([]byte("secet")))
+			interceptor, err := NewAuthInterceptor(WithDefaultBearerExtractorAndParser([]byte("secet")))
 			assert.Nil(t, err)
 			return interceptor
 		},
@@ -135,7 +135,7 @@ var unaryAuthTests = []struct {
 	{
 		Case: "default",
 		Interceptor: func(t *testing.T) connect.Interceptor {
-			interceptor, err := NewAuthInterceptor(WithDefaultBeearerExtractorAndParser([]byte("secret")))
+			interceptor, err := NewAuthInterceptor(WithDefaultBearerExtractorAndParser([]byte("secret")))
 			assert.Nil(t, err)
 			return interceptor
 		},
@@ -159,7 +159,7 @@ var unaryAuthTests = []struct {
 		Case: "custom claim",
 		Interceptor: func(t *testing.T) connect.Interceptor {
 			interceptor, err := NewAuthInterceptor(
-				WithDefaultBearerTokenExtractor(false),
+				WithDefaultBearerExtractor(false),
 				WithCustomJWTClaimsParser([]byte("secret"), func(ctx context.Context) jwt.Claims {
 					return &jwtCustomClaims{}
 				}),

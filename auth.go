@@ -140,14 +140,14 @@ func (i *authInterceptor) preventNilStreamHandler() {
 	}
 }
 
-func WithDefaultBeearerExtractorAndParser(signningKey any) opt {
+func WithDefaultBearerExtractorAndParser(signningKey any) opt {
 	return func(i *authInterceptor) {
 		i.preventNilUnaryHandler()
 		i.parser = DefaultJWTMapClaimsParser(signningKey)
 		i.unaryHandler.Extractor = DefaultBearerTokenExtractor().ToUnaryExtractor()
 	}
 }
-func WithDefaultExtractorAndParserUseStream(signningKey any) opt {
+func WithDefaultBearerExtractorAndParserUseStream(signningKey any) opt {
 	return func(i *authInterceptor) {
 		i.preventNilUnaryHandler()
 		i.parser = DefaultJWTMapClaimsParser(signningKey)
@@ -157,7 +157,7 @@ func WithDefaultExtractorAndParserUseStream(signningKey any) opt {
 	}
 }
 
-func WithDefaultBearerTokenExtractor(useStream bool) opt {
+func WithDefaultBearerExtractor(useStream bool) opt {
 	return func(i *authInterceptor) {
 		i.preventNilUnaryHandler()
 		i.unaryHandler.Extractor = DefaultBearerTokenExtractor().ToUnaryExtractor()
@@ -165,13 +165,6 @@ func WithDefaultBearerTokenExtractor(useStream bool) opt {
 			i.preventNilStreamHandler()
 			i.streamHandler.Extractor = DefaultBearerTokenExtractor().ToStreamExtractor()
 		}
-	}
-}
-
-func WithDefaultStreamBearerTokenExtractor() opt {
-	return func(i *authInterceptor) {
-		i.preventNilStreamHandler()
-		i.streamHandler.Extractor = DefaultBearerTokenExtractor().ToStreamExtractor()
 	}
 }
 

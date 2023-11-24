@@ -64,7 +64,7 @@ func (s *PingServer) CumSum(
 }
 
 func main() {
-	auth, err := middleware.NewAuthInterceptor(middleware.WithDefaultExtractorAndParserUseStream([]byte("secret")))
+	auth, err := middleware.NewAuthInterceptor(middleware.WithDefaultBearerExtractorAndParser([]byte("secret")))
 	if err != nil {
 		panic(err)
 	}
