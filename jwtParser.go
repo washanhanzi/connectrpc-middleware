@@ -13,13 +13,6 @@ type jwtParser struct {
 	// The order of precedence is a user-defined KeyFunc, SigningKeys and SigningKey.
 	// Required if neither user-defined KeyFunc nor SigningKeys is provided.
 	SigningKey any
-	// Signing method used to check the token's signing algorithm.
-	// Optional. Default value HS256.
-	SigningMethod string
-	// Claims are extendable claims data defining token content. Used by default ParseTokenFunc implementation.
-	// Not used if custom ParseTokenFunc is set.
-	// Optional. Defaults to function returning jwt.MapClaims
-	NewClaimsFunc func(c context.Context) jwt.Claims
 	// KeyFunc defines a user-defined function that supplies the public key for a token validation.
 	// The function shall take care of verifying the signing algorithm and selecting the proper key.
 	// A user-defined KeyFunc can be useful if tokens are issued by an external party.
@@ -36,6 +29,12 @@ type jwtParser struct {
 	// The order of precedence is a user-defined KeyFunc, SigningKeys and SigningKey.
 	// Required if neither user-defined KeyFunc nor SigningKey is provided.
 	SigningKeys map[string]any
+	// Signing method used to check the token's signing algorithm.
+	// Optional. Default value HS256.
+	SigningMethod string
+	// NewClaimsFunc is used during parsing the token, it must return a reference for json unmarshalling to work
+	// Default to function returning jwt.MapClaims
+	NewClaimsFunc func(c context.Context) jwt.Claims
 }
 
 const (
@@ -51,20 +50,24 @@ func NewJWTParser(opts ...jwtParserOpt) (jwtParser, error) {
 		o(&p)
 	}
 
+	// set default singing method
 	if p.SigningMethod == "" {
 		p.SigningMethod = AlgorithmHS256
 	}
 
+	//set default claims func
 	if p.NewClaimsFunc == nil {
 		p.NewClaimsFunc = func(context.Context) jwt.Claims {
 			return jwt.MapClaims{}
 		}
 	}
 
+	//check for signing key
 	if p.SigningKey == nil && len(p.SigningKeys) == 0 && p.KeyFunc == nil {
 		return p, errors.New("jwt parser requires signing key")
 	}
 
+	//if singing key is provided, set default key func
 	if p.KeyFunc == nil {
 		if len(p.SigningKeys) != 0 {
 			p.KeyFunc = p.defaultKeyFuncForSigningKeys
@@ -75,11 +78,13 @@ func NewJWTParser(opts ...jwtParserOpt) (jwtParser, error) {
 	return p, nil
 }
 
+// DefaultJWTMapClaimsParser returns a jwtParser with default jwt.MapClaims and signingMethod
 func DefaultJWTMapClaimsParser(signingKey any) Parser {
 	p, _ := NewJWTParser(WithJWTMapClaims(signingKey))
 	return p.ToParser()
 }
 
+// WithJWTMapClaims returns a jwtParser with default jwt.MapClaims and signingMethod
 func WithJWTMapClaims(signingKey any) jwtParserOpt {
 	return func(p *jwtParser) {
 		p.SigningKey = signingKey
@@ -158,9 +163,6 @@ func (j jwtParser) ParserJWT(token string, claims jwt.Claims) error {
 	return nil
 }
 
-// defaultKeyFuncForSigningKeys creates JWTGo implementation for KeyFunc.
-//
-// error returns TokenError.
 func (j jwtParser) defaultKeyFuncForSigningKeys(token *jwt.Token) (any, error) {
 	if token.Method.Alg() != j.SigningMethod {
 		return nil, errors.Newf("unexpected jwt signing method=%v", token.Header["alg"])

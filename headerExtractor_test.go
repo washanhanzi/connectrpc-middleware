@@ -18,7 +18,12 @@ type headerValuesTest struct {
 }
 
 var headerValuesTests = []headerValuesTest{
-	//TODO invalid source name
+	{
+		Case:         "invalid config source",
+		Configs:      []LookupConfig{{Source: "body", Name: "Authorization"}},
+		ConstructErr: `invalid config source "body", only "header" and "cookie" are supported`,
+		Err:          errHeaderExtractorValueMissing.Error(),
+	},
 	{
 		Case:    "invalid header",
 		Configs: []LookupConfig{{Source: "header", Name: "Authorization"}},
@@ -69,7 +74,14 @@ var headerValuesTests = []headerValuesTest{
 			"Authorization": {"xxxx"},
 		},
 	},
-	//TODO config case insensitive
+	{
+		Case:    "config case insentive",
+		Header:  map[string]string{"Authorization": "BeaRer xxxx"},
+		Configs: []LookupConfig{{Source: "header", Name: "AuthorizAtion", CutPrefix: "beARer "}},
+		Want: map[string][]string{
+			"AuthorizAtion": {"xxxx"},
+		},
+	},
 	{
 		Case: "multiple values",
 		Header: map[string]string{

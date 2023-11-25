@@ -22,6 +22,11 @@ func (h ExtractedHeader) Get(key string) []string {
 	return h[key]
 }
 
+// HeaderExtractor can take multiple LookupConfig as config
+// LookupConfig is used to extract token from request header, it can either be header value or cookie value
+// ToExtractor will output a function which can extract values from header based on the provided configs
+// The returned ExtractedHeader is case sensitive and will keep the config.Name case
+// The Extractor returned by ToExtractor will use config.Name's canonical format to extract values from header
 type HeaderExtractor struct {
 	configs []LookupConfig
 }
@@ -50,6 +55,11 @@ func NewHeaderExtractor(opts ...headerExtractorOpt) (HeaderExtractor, error) {
 	}
 	if len(e.configs) == 0 {
 		return e, errors.New("no lookup config provided")
+	}
+	for _, config := range e.configs {
+		if config.Source != TokenSourceHeader && config.Source != TokenSourceCookie {
+			return e, errors.Newf(`invalid config source "%s", only "header" and "cookie" are supported`, config.Source)
+		}
 	}
 	return e, nil
 }
@@ -98,6 +108,11 @@ func DefaultBasicExtractor() HeaderExtractor {
 	}
 }
 
+// ToExtractor return a function which can extract values from header based on the provided configs
+// it loop through the LookupConfigs, if the config source is header, it will extract values from header
+// if the config source is cookie, it will extract values from cookie
+// it will try to extract at least one value with the provided configs
+// if no value can be extracted, it will return errHeaderExtractorValueMissing
 func (e HeaderExtractor) ToExtractor() Extractor {
 	return func(ctx context.Context, req *Request) (ExtractedHeader, error) {
 		extracted := newExtractedHeader(len(e.configs))
@@ -130,12 +145,11 @@ func (e HeaderExtractor) ToExtractor() Extractor {
 var errHeaderExtractorValueMissing = errors.New("missing value in request header")
 var errHeaderExtractorValueInvalid = errors.New("invalid value in request header")
 
-// ValuesFromHeader returns a functions that extracts values from the request header.
-// valuePrefix is parameter to remove first part (prefix) of the extracted value. This is useful if header value has static
-// prefix like `Authorization: <auth-scheme> <authorisation-parameters>` where part that we want to remove is `<auth-scheme> `
-// note the space at the end. In case of basic authentication `Authorization: Basic <credentials>` prefix we want to remove
-// is `Basic `. In case of JWT tokens `Authorization: Bearer <token>` prefix is `Bearer `.
-// If prefix is left empty the whole value is returned.
+// ValuesFromHeader take http.Request.Header.Values and a prefix as input
+// return a slice of string without the prefix
+// when values is empty, return errHeaderExtractorValueMissing
+// when prefix is empty, return the input values, keep the http.Request.Header.Values backing array if there is one
+// when prefix is not empty, return a new slice of values without the prefix
 func ValuesFromHeader(values []string, valuePrefix string) ([]string, error) {
 	if len(values) == 0 {
 		return nil, errHeaderExtractorValueMissing
