@@ -92,7 +92,7 @@ func WithJWTMapClaims(signingKey any) jwtParserOpt {
 		p.NewClaimsFunc = func(context.Context) jwt.Claims {
 			return jwt.MapClaims{}
 		}
-		p.KeyFunc = p.defaultKeyFuncForSigningKeys
+		p.KeyFunc = p.defaultKeyFuncForSigningKey
 	}
 }
 

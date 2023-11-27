@@ -64,17 +64,21 @@ func (s *PingServer) CumSum(
 }
 
 func main() {
-	auth, err := middleware.NewAuthInterceptor(middleware.WithDefaultBearerExtractorAndParser([]byte("secret")))
+	// auth, err := middleware.NewAuthInterceptor(middleware.WithInterceptorDefaultBearerExtractorAndParser([]byte("secret")))
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// interceptors := connect.WithInterceptors(auth)
+	greeter := &PingServer{pingv1connect.UnimplementedPingServiceHandler{}}
+	mux := http.NewServeMux()
+	mux.Handle(pingv1connect.NewPingServiceHandler(greeter))
+	authMiddleware, err := middleware.NewAuthMiddleware(middleware.WithDefaultBearerExtractorAndParser([]byte("secret")))
 	if err != nil {
 		panic(err)
 	}
-	interceptors := connect.WithInterceptors(auth)
-	greeter := &PingServer{pingv1connect.UnimplementedPingServiceHandler{}}
-	mux := http.NewServeMux()
-	mux.Handle(pingv1connect.NewPingServiceHandler(greeter, interceptors))
 	http.ListenAndServe(
 		"localhost:8080",
 		// Use h2c so we can serve HTTP/2 without TLS.
-		h2c.NewHandler(mux, &http2.Server{}),
+		h2c.NewHandler(authMiddleware.Wrap(mux), &http2.Server{}),
 	)
 }

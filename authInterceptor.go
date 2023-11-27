@@ -29,14 +29,13 @@ However, the added generic has no benefit when extract the value from context, u
 */
 type authInterceptor struct {
 	ServiceHandlerType
-	parser         Parser
 	clientHandler  ClientTokenGetter
 	serviceHandler *AuthHandler
 }
 
-type opt func(*authInterceptor)
+type authInterceptorOpt func(*authInterceptor)
 
-func NewAuthInterceptor(opts ...opt) (*authInterceptor, error) {
+func NewAuthInterceptor(opts ...authInterceptorOpt) (*authInterceptor, error) {
 	i := authInterceptor{
 		ServiceHandlerType: UnaryHandler,
 		serviceHandler: &AuthHandler{
@@ -70,24 +69,24 @@ func (i *authInterceptor) preventNilServiceHandler() {
 	}
 }
 
-func WithDefaultBearerExtractor() opt {
+func WithInterceptorDefaultBearerExtractor() authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
-		i.serviceHandler.Extractor = DefaultBearerTokenExtractor().ToExtractor()
+		i.serviceHandler.Extractor = DefaultBasicExtractor().ToExtractor()
 	}
 }
 
-func WithDefaultBearerExtractorAndParser(signningKey any) opt {
+func WithInterceptorDefaultBearerExtractorAndParser(signningKey any) authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
-		i.parser = DefaultJWTMapClaimsParser(signningKey)
-		i.serviceHandler.Extractor = DefaultBearerTokenExtractor().ToExtractor()
+		i.serviceHandler.Parser = DefaultJWTMapClaimsParser(signningKey)
+		i.serviceHandler.Extractor = DefaultBasicExtractor().ToExtractor()
 	}
 }
 
-func WithDefaultJWTMapClaimsParser(signningKey any) opt {
+func WithInterceptorDefaultJWTMapClaimsParser(signningKey any) authInterceptorOpt {
 	return func(i *authInterceptor) {
-		i.parser = DefaultJWTMapClaimsParser(signningKey)
+		i.serviceHandler.Parser = DefaultJWTMapClaimsParser(signningKey)
 	}
 }
 
@@ -97,14 +96,14 @@ func WithDefaultJWTMapClaimsParser(signningKey any) opt {
 //	func(ctx context.Context) jwt.Claims{
 //		return &jwt.MapClaims{}
 //	}
-func WithCustomJWTClaimsParser(signningKey any, claimsFunc func(context.Context) jwt.Claims) opt {
+func WithInterceptorCustomJWTClaimsParser(signningKey any, claimsFunc func(context.Context) jwt.Claims) authInterceptorOpt {
 	return func(i *authInterceptor) {
 		p, _ := NewJWTParser(WithSigningKey(signningKey), WithNewClaimsFunc(claimsFunc))
-		i.parser = p.ToParser()
+		i.serviceHandler.Parser = p.ToParser()
 	}
 }
 
-func WithIgnoreError() opt {
+func WithInterceptorIgnoreError() authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
 		i.serviceHandler.ErrorHandler = func(context.Context, *Request, error) error {
@@ -114,55 +113,55 @@ func WithIgnoreError() opt {
 }
 
 // WithClientTokenGetter sets client token getter when the interceptor in client side
-func WithClientTokenGetter(getter ClientTokenGetter) opt {
+func WithInterceptorClientTokenGetter(getter ClientTokenGetter) authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.clientHandler = getter
 	}
 }
 
 // WithUnarySkipper skip the interceptor for unary handler
-func WithSkipper(s Skipper) opt {
+func WithInterceptorSkipper(s Skipper) authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
 		i.serviceHandler.Skipper = s
 	}
 }
 
-func WithBeforeFunc(fn BeforeOrSuccessFunc) opt {
+func WithInterceptorBeforeFunc(fn BeforeOrSuccessFunc) authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
 		i.serviceHandler.BeforeFunc = fn
 	}
 }
 
-func WithSuccessFunc(fn BeforeOrSuccessFunc) opt {
+func WithInterceptorSuccessFunc(fn BeforeOrSuccessFunc) authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
 		i.serviceHandler.SuccessFunc = fn
 	}
 }
 
-func WithErrorHandler(fn ErrorHandle) opt {
+func WithInterceptorErrorHandler(fn ErrorHandle) authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
 		i.serviceHandler.ErrorHandler = fn
 	}
 }
 
-func WithExtractor(fn Extractor) opt {
+func WithInterceptorExtractor(fn Extractor) authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
 		i.serviceHandler.Extractor = fn
 	}
 }
 
-func WithParser(p Parser) opt {
+func WithInterceptorParser(p Parser) authInterceptorOpt {
 	return func(i *authInterceptor) {
-		i.parser = p
+		i.serviceHandler.Parser = p
 	}
 }
 
-func WithServiceHandlerType(s ServiceHandlerType) opt {
+func WithServiceHandlerType(s ServiceHandlerType) authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.ServiceHandlerType = s
 	}

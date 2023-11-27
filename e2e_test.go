@@ -31,7 +31,7 @@ func newServer(t *testing.T, interceptor connect.Interceptor, validator func(con
 	return memhttptest.New(t, mux)
 }
 func TestE2E(t *testing.T) {
-	authInterceptor, err := NewAuthInterceptor(WithDefaultBearerExtractorAndParser([]byte("secret")))
+	authInterceptor, err := NewAuthInterceptor(WithInterceptorDefaultBearerExtractorAndParser([]byte("secret")))
 	assert.Nil(t, err)
 	s := newServer(t, authInterceptor, func(ctx context.Context) {
 		claims, ok := FromContext[jwt.MapClaims](ctx)
