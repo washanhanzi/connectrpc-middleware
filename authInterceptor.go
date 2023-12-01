@@ -183,14 +183,18 @@ func (i *authInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 			return next(ctx, req)
 		}
 		peer := req.Peer()
+		parseReq := &Request{
+			Procedure:  spec.Procedure,
+			ClientAddr: peer.Addr,
+			Protocol:   peer.Protocol,
+			Header:     req.Header(),
+		}
+		if i.serviceHandler.Skipper(ctx, parseReq) {
+			return next(ctx, req)
+		}
 		ctx, err := extractAndParse(
 			ctx,
-			&Request{
-				Procedure:  spec.Procedure,
-				ClientAddr: peer.Addr,
-				Protocol:   peer.Protocol,
-				Header:     req.Header(),
-			},
+			parseReq,
 			i.serviceHandler,
 		)
 		if err != nil {
@@ -219,14 +223,18 @@ func (i *authInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc
 			return next(ctx, conn)
 		}
 		peer := conn.Peer()
+		req := &Request{
+			Procedure:  conn.Spec().Procedure,
+			ClientAddr: peer.Addr,
+			Protocol:   peer.Protocol,
+			Header:     conn.RequestHeader(),
+		}
+		if i.serviceHandler.Skipper(ctx, req) {
+			return next(ctx, conn)
+		}
 		ctx, err := extractAndParse(
 			ctx,
-			&Request{
-				Procedure:  conn.Spec().Procedure,
-				ClientAddr: peer.Addr,
-				Protocol:   peer.Protocol,
-				Header:     conn.RequestHeader(),
-			},
+			req,
 			i.serviceHandler,
 		)
 		if err != nil {

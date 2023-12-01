@@ -92,9 +92,6 @@ func DefaultSkipper(context.Context, *Request) bool {
 }
 
 func extractAndParse(ctx context.Context, req *Request, h *AuthHandler) (context.Context, error) {
-	if h.Skipper(ctx, req) {
-		return nil, nil
-	}
 	if h.BeforeFunc != nil {
 		h.BeforeFunc(ctx, req)
 	}

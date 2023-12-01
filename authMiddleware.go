@@ -136,12 +136,17 @@ func (m *authMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 		ctx := r.Context()
-		newCtx, err := extractAndParse(ctx, &Request{
+		req := &Request{
 			Procedure:  procedureFromHTTP(r),
 			ClientAddr: r.RemoteAddr,
 			Protocol:   protocolFromHTTP(r),
 			Header:     r.Header,
-		}, m.handler)
+		}
+		if m.handler.Skipper(ctx, req) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		newCtx, err := extractAndParse(ctx, req, m.handler)
 		if err != nil {
 			m.errW.Write(w, r, err)
 			return
