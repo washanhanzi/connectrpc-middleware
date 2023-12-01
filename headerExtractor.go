@@ -124,6 +124,7 @@ func (e HeaderExtractor) ToExtractor() Extractor {
 				extractedValues, err := ValuesFromHeader(values, c.CutPrefix)
 				if err != nil {
 					lastErr = err
+					continue
 				}
 				extracted.Set(c.Name, extractedValues)
 			case TokenSourceCookie:
@@ -131,6 +132,7 @@ func (e HeaderExtractor) ToExtractor() Extractor {
 				values, err := ValuesFromCookie(c.Name, cookiesRaw)
 				if err != nil {
 					lastErr = err
+					continue
 				}
 				extracted.Set(c.Name, values)
 			}
