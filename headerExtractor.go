@@ -96,7 +96,7 @@ func DefaultBearerTokenExtractor() HeaderExtractor {
 	}
 }
 
-func DefaultBasicExtractor() HeaderExtractor {
+func DefaultBasicAuthExtractor() HeaderExtractor {
 	return HeaderExtractor{
 		configs: []LookupConfig{
 			{

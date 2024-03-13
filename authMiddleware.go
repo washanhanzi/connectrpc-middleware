@@ -48,7 +48,7 @@ func (m *authMiddleware) preventNilHandler() {
 func WithDefaultBearerExtractor() authMiddlewareOpt {
 	return func(m *authMiddleware) {
 		m.preventNilHandler()
-		m.handler.Extractor = DefaultBasicExtractor().ToExtractor()
+		m.handler.Extractor = DefaultBasicAuthExtractor().ToExtractor()
 	}
 }
 
@@ -96,14 +96,14 @@ func WithSkipper(s Skipper) authMiddlewareOpt {
 	}
 }
 
-func WithBeforeFunc(fn BeforeOrSuccessFunc) authMiddlewareOpt {
+func WithBeforeFunc(fn BeforeFunc) authMiddlewareOpt {
 	return func(m *authMiddleware) {
 		m.preventNilHandler()
 		m.handler.BeforeFunc = fn
 	}
 }
 
-func WithSuccessFunc(fn BeforeOrSuccessFunc) authMiddlewareOpt {
+func WithSuccessFunc(fn SuccessFunc) authMiddlewareOpt {
 	return func(m *authMiddleware) {
 		m.handler.SuccessFunc = fn
 	}

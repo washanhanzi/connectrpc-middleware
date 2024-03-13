@@ -72,7 +72,7 @@ func (i *authInterceptor) preventNilServiceHandler() {
 func WithInterceptorDefaultBearerExtractor() authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
-		i.serviceHandler.Extractor = DefaultBasicExtractor().ToExtractor()
+		i.serviceHandler.Extractor = DefaultBearerTokenExtractor().ToExtractor()
 	}
 }
 
@@ -80,7 +80,7 @@ func WithInterceptorDefaultBearerExtractorAndParser(signningKey any) authInterce
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
 		i.serviceHandler.Parser = DefaultJWTMapClaimsParser(signningKey)
-		i.serviceHandler.Extractor = DefaultBasicExtractor().ToExtractor()
+		i.serviceHandler.Extractor = DefaultBearerTokenExtractor().ToExtractor()
 	}
 }
 
@@ -127,14 +127,14 @@ func WithInterceptorSkipper(s Skipper) authInterceptorOpt {
 	}
 }
 
-func WithInterceptorBeforeFunc(fn BeforeOrSuccessFunc) authInterceptorOpt {
+func WithInterceptorBeforeFunc(fn BeforeFunc) authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
 		i.serviceHandler.BeforeFunc = fn
 	}
 }
 
-func WithInterceptorSuccessFunc(fn BeforeOrSuccessFunc) authInterceptorOpt {
+func WithInterceptorSuccessFunc(fn SuccessFunc) authInterceptorOpt {
 	return func(i *authInterceptor) {
 		i.preventNilServiceHandler()
 		i.serviceHandler.SuccessFunc = fn

@@ -26,7 +26,6 @@ func (s *PingServer) Ping(
 	ctx context.Context,
 	req *connect.Request[pingv1.PingRequest],
 ) (*connect.Response[pingv1.PingResponse], error) {
-	log.Println("Request headers: ", req.Header())
 	payload, ok := middleware.FromContext[jwt.MapClaims](ctx)
 	log.Println(payload, ok)
 	res := connect.NewResponse(&pingv1.PingResponse{
