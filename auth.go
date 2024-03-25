@@ -65,10 +65,10 @@ type (
 	}
 	// Skipper can return true to skip middleware
 	Skipper func(context.Context, *Request) bool
-	// BeforeFunc is a type served to AuthHandler
+	// BeforeFunc
 	BeforeFunc func(context.Context, *Request) error
-	// SuccessFunc is a type served to AuthHandler
-	SuccessFunc func(context.Context, *Request, any) error
+	// SuccessFunc
+	SuccessFunc func(context.Context, *Request) error
 	// ErrorHandle take error from Extractor or Parser, return nil to ignore error
 	ErrorHandle func(context.Context, *Request, error) error
 	// AuthHandler is used in unary and streaming service handler
@@ -123,7 +123,7 @@ func extractAndParse(ctx context.Context, req *Request, h *AuthHandler) (context
 		if err == nil {
 			ctx = NewContext(ctx, payload)
 			if h.SuccessFunc != nil {
-				err := h.SuccessFunc(ctx, req, payload)
+				err := h.SuccessFunc(ctx, req)
 				if err != nil {
 					return ctx, err
 				}

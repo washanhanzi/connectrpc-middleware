@@ -68,9 +68,10 @@ func TestBeforeFunc(t *testing.T) {
 }
 
 func TestSuccessFunc(t *testing.T) {
-	authInterceptor, err := NewAuthInterceptor(WithInterceptorDefaultBearerExtractorAndParser(validKey), WithInterceptorSuccessFunc(func(ctx context.Context, r *Request, payload any) error {
-		assert.Equal(t, "John Doe", payload.(jwt.MapClaims)["name"])
-		assert.Equal(t, true, payload.(jwt.MapClaims)["admin"])
+	authInterceptor, err := NewAuthInterceptor(WithInterceptorDefaultBearerExtractorAndParser(validKey), WithInterceptorSuccessFunc(func(ctx context.Context, r *Request) error {
+		claims, _ := FromContext[jwt.MapClaims](ctx)
+		assert.Equal(t, "John Doe", claims["name"])
+		assert.Equal(t, true, claims["admin"])
 		return connect.NewError(connect.CodeAborted, errors.New("aborted"))
 	}))
 	assert.Nil(t, err)
