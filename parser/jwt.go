@@ -1,4 +1,4 @@
-package middleware
+package parser
 
 import (
 	"context"
@@ -7,7 +7,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type jwtParser struct {
+const (
+	// AlgorithmHS256 is token signing algorithm
+	AlgorithmHS256 = "HS256"
+)
+
+type JwtParser struct {
 	// Signing key to validate token.
 	// This is one of the three options to provide a token validation key.
 	// The order of precedence is a user-defined KeyFunc, SigningKeys and SigningKey.
@@ -37,15 +42,10 @@ type jwtParser struct {
 	NewClaimsFunc func(c context.Context) jwt.Claims
 }
 
-const (
-	// AlgorithmHS256 is token signing algorithm
-	AlgorithmHS256 = "HS256"
-)
+type jwtParserOpt func(*JwtParser)
 
-type jwtParserOpt func(*jwtParser)
-
-func NewJWTParser(opts ...jwtParserOpt) (jwtParser, error) {
-	p := jwtParser{}
+func NewJwtParser(opts ...jwtParserOpt) (JwtParser, error) {
+	p := JwtParser{}
 	for _, o := range opts {
 		o(&p)
 	}
@@ -78,15 +78,9 @@ func NewJWTParser(opts ...jwtParserOpt) (jwtParser, error) {
 	return p, nil
 }
 
-// DefaultJWTMapClaimsParser returns a jwtParser with default jwt.MapClaims and signingMethod
-func DefaultJWTMapClaimsParser(signingKey any) Parser {
-	p, _ := NewJWTParser(WithJWTMapClaims(signingKey))
-	return p.ToParser()
-}
-
 // WithJWTMapClaims returns a jwtParser with default jwt.MapClaims and signingMethod
 func WithJWTMapClaims(signingKey any) jwtParserOpt {
-	return func(p *jwtParser) {
+	return func(p *JwtParser) {
 		p.SigningKey = signingKey
 		p.SigningMethod = AlgorithmHS256
 		p.NewClaimsFunc = func(context.Context) jwt.Claims {
@@ -97,73 +91,52 @@ func WithJWTMapClaims(signingKey any) jwtParserOpt {
 }
 
 func WithSigningKey(signingKey any) jwtParserOpt {
-	return func(p *jwtParser) {
+	return func(p *JwtParser) {
 		p.SigningKey = signingKey
 	}
 }
 
 func WithSigningKeys(signingKeys map[string]any) jwtParserOpt {
-	return func(p *jwtParser) {
+	return func(p *JwtParser) {
 		p.SigningKeys = signingKeys
 	}
 }
 
 func WithSigningMethod(signingMethod string) jwtParserOpt {
-	return func(p *jwtParser) {
+	return func(p *JwtParser) {
 		p.SigningMethod = signingMethod
 	}
 }
 
 // WithNewClaimsFunc sets NewClaimsFunc. the newClaimsFunc must return a reference for json unmarshalling to work
 func WithNewClaimsFunc(newClaimsFunc func(context.Context) jwt.Claims) jwtParserOpt {
-	return func(p *jwtParser) {
+	return func(p *JwtParser) {
 		p.NewClaimsFunc = newClaimsFunc
 	}
 }
 
 func WithKeyFunc(keyFunc jwt.Keyfunc) jwtParserOpt {
-	return func(p *jwtParser) {
+	return func(p *JwtParser) {
 		p.KeyFunc = keyFunc
 	}
 }
 
-func (j jwtParser) ToParser() Parser {
-	return func(ctx context.Context, extractedHeader ExtractedHeader) (any, error) {
-		for _, values := range extractedHeader {
-			for _, v := range values {
-				if v == "" {
-					return nil, errors.New("empty jwt token")
-				}
-				claims := j.NewClaimsFunc(ctx)
-				jwtToken, err := jwt.ParseWithClaims(v, claims, j.KeyFunc)
-				if err != nil {
-					return nil, err
-				}
-				if !jwtToken.Valid {
-					return nil, errors.New("invalid jwt token")
-				}
-				return claims, nil
-			}
-		}
-		return nil, nil
-	}
-}
-
-func (j jwtParser) ParserJWT(token string, claims jwt.Claims) error {
+func (j JwtParser) Parse(ctx context.Context, token string) (jwt.Claims, error) {
 	if token == "" {
-		return errors.New("empty jwt token")
+		return nil, errors.New("empty jwt token")
 	}
+	claims := j.NewClaimsFunc(ctx)
 	jwtToken, err := jwt.ParseWithClaims(token, claims, j.KeyFunc)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !jwtToken.Valid {
-		return errors.New("invalid jwt token")
+		return nil, errors.New("invalid jwt token")
 	}
-	return nil
+	return claims, nil
 }
 
-func (j jwtParser) defaultKeyFuncForSigningKeys(token *jwt.Token) (any, error) {
+func (j JwtParser) defaultKeyFuncForSigningKeys(token *jwt.Token) (any, error) {
 	if token.Method.Alg() != j.SigningMethod {
 		return nil, errors.Newf("unexpected jwt signing method=%v", token.Header["alg"])
 	}
@@ -176,7 +149,7 @@ func (j jwtParser) defaultKeyFuncForSigningKeys(token *jwt.Token) (any, error) {
 	return nil, errors.Newf("unexpected jwt key id=%v", token.Header["kid"])
 }
 
-func (j jwtParser) defaultKeyFuncForSigningKey(token *jwt.Token) (any, error) {
+func (j JwtParser) defaultKeyFuncForSigningKey(token *jwt.Token) (any, error) {
 	if token.Method.Alg() != j.SigningMethod {
 		return nil, errors.Newf("unexpected jwt signing method=%v", token.Header["alg"])
 	}
