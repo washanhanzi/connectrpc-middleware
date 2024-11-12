@@ -72,14 +72,13 @@ type (
 		// If this function return an error, the middleware will return the error and skip the rest of the process
 		// HandleError will be ignored if Before return an error
 		Before(ctx context.Context, req *Request) error
-		// Extract defines a function which is used to extract data from request, and write to repository
+		// Extract defines a function which is used to extract data from request, and may return a new context to be used in parse
 		Extract(ctx context.Context, req *Request) (context.Context, error)
-		// Parse is used to parse data from a repository
+		// Parse is used to parse data from context
 		Parse(ctx context.Context) (any, error)
 		// Success defines a function which is executed after Extracor and Parser when they return no error.
-		// This function accepts the context, the request and the payload returned by Parser.
+		// This function accepts the modified context, and the request.
 		// If this function return an error, the middleware will return with the error and skip error handler.
-		// HandleError will be ignored if Success return an error.
 		Success(ctx context.Context, req *Request) error
 		// HandleError defines a function which is executed when Extractor or Parser return error.
 		HandleError(ctx context.Context, req *Request, err error) error

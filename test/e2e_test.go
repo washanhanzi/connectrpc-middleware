@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"testing"
@@ -60,41 +61,57 @@ func TestNormalInterceptor(t *testing.T) {
 	assert.Equal(t, connect.CodeUnimplemented, err.(*connect.Error).Code())
 }
 
-// func TestBeforeFunc(t *testing.T) {
-// 	authInterceptor, err := NewAuthInterceptor(WithInterceptorDefaultBearerExtractorAndParser(validKey), WithInterceptorBeforeFunc(func(ctx context.Context, r *Request) error {
-// 		return connect.NewError(connect.CodeAborted, errors.New("aborted"))
-// 	}))
-// 	assert.Nil(t, err)
-// 	s := newServer(t, authInterceptor, func(ctx context.Context) {
-// 		claims, ok := FromContext[jwt.MapClaims](ctx)
-// 		assert.True(t, ok)
-// 		assert.Equal(t, claims["name"], "John Doe")
-// 		assert.Equal(t, claims["admin"], true)
-// 	})
-// 	req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
-// 	req.Header().Set(HeaderAuthorization, validAuth)
-// 	client := pingv1connect.NewPingServiceClient(s.Client(), s.URL())
-// 	_, err = client.Ping(context.Background(), req)
-// 	assert.Equal(t, connect.CodeAborted, err.(*connect.Error).Code())
-// }
+func TestBeforeFunc(t *testing.T) {
+	jwtHandler := handler.NewJWTHandler(
+		handler.NewShim(
+			handler.WithBeforeFunc(func(ctx context.Context, req *middleware.Request) error {
+				return connect.NewError(connect.CodeAborted, errors.New("aborted"))
+			}),
+		),
+		handler.WithJwtMapClaimsParser(validKey),
+	)
+	authInterceptor, err := middleware.NewAuthInterceptor(
+		middleware.WithServiceHandler(jwtHandler),
+	)
+	assert.Nil(t, err)
+	s := newServer(t, authInterceptor, func(ctx context.Context) {
+		claims, ok := middleware.FromContext[jwt.MapClaims](ctx)
+		assert.True(t, ok)
+		assert.Equal(t, claims["name"], "John Doe")
+		assert.Equal(t, claims["admin"], true)
+	})
+	req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
+	req.Header().Set("Authorization", validAuth)
+	client := pingv1connect.NewPingServiceClient(s.Client(), s.URL())
+	_, err = client.Ping(context.Background(), req)
+	assert.Equal(t, connect.CodeAborted, err.(*connect.Error).Code())
+}
 
-// func TestSuccessFunc(t *testing.T) {
-// 	authInterceptor, err := NewAuthInterceptor(WithInterceptorDefaultBearerExtractorAndParser(validKey), WithInterceptorSuccessFunc(func(ctx context.Context, r *Request) error {
-// 		claims, _ := FromContext[jwt.MapClaims](ctx)
-// 		assert.Equal(t, "John Doe", claims["name"])
-// 		assert.Equal(t, true, claims["admin"])
-// 		return connect.NewError(connect.CodeAborted, errors.New("aborted"))
-// 	}))
-// 	assert.Nil(t, err)
-// 	s := newServer(t, authInterceptor, func(ctx context.Context) {
-// 		claims, ok := FromContext[jwt.MapClaims](ctx)
-// 		assert.True(t, ok)
-// 		assert.Equal(t, "John Doe", claims["name"])
-// 		assert.Equal(t, true, claims["admin"])
-// 	})
-// 	req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
-// 	req.Header().Set(HeaderAuthorization, validAuth)
-// 	client := pingv1connect.NewPingServiceClient(s.Client(), s.URL())
-// 	_, err = client.Ping(context.Background(), req)
-// 	assert.Equal(t, connect.CodeAborted, err.(*connect.Error).Code())
-// }
+func TestSuccessFunc(t *testing.T) {
+	jwtHandler := handler.NewJWTHandler(
+		handler.NewShim(
+			handler.WithSuccessFunc(func(ctx context.Context, req *middleware.Request) error {
+				claims, _ := middleware.FromContext[jwt.MapClaims](ctx)
+				assert.Equal(t, "John Doe", claims["name"])
+				assert.Equal(t, true, claims["admin"])
+				return connect.NewError(connect.CodeAborted, errors.New("aborted"))
+			}),
+		),
+		handler.WithJwtMapClaimsParser(validKey),
+	)
+	authInterceptor, err := middleware.NewAuthInterceptor(
+		middleware.WithServiceHandler(jwtHandler),
+	)
+	assert.Nil(t, err)
+	s := newServer(t, authInterceptor, func(ctx context.Context) {
+		claims, ok := middleware.FromContext[jwt.MapClaims](ctx)
+		assert.True(t, ok)
+		assert.Equal(t, "John Doe", claims["name"])
+		assert.Equal(t, true, claims["admin"])
+	})
+	req := connect.NewRequest[pingv1.PingRequest](&pingv1.PingRequest{})
+	req.Header().Set("Authorization", validAuth)
+	client := pingv1connect.NewPingServiceClient(s.Client(), s.URL())
+	_, err = client.Ping(context.Background(), req)
+	assert.Equal(t, connect.CodeAborted, err.(*connect.Error).Code())
+}

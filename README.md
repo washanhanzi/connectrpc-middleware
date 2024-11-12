@@ -2,28 +2,37 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/washanhanzi/connectrpc-middleware#section-readme.svg)](https://pkg.go.dev/github.com/washanhanzi/connectrpc-middleware#section-readme)
 
-## auth interceptor
+# auth middleware
 
-used with caution, still in development
+## default jwt middleware
 
 ```go
-//default bearer token extractor and parser
-//extract token from "Authorization": Bearer <token>, and parse token into jwt.MapClaim
-authMiddleware, err := middleware.NewAuthMiddleware(middleware.WithDefaultBearerExtractorAndParser([]byte("secret")))
-if err != nil {
-	panic(err)
-}
-http.ListenAndServe(
-	"localhost:8080",
-	// Use h2c so we can serve HTTP/2 without TLS.
-	h2c.NewHandler(authMiddleware.Wrap(mux), &http2.Server{}),
-)
+	//a default jwt handler
+	jwtHandler := handler.NewJWTHandler(
+		//add skip, before, success, error to shim()
+		handler.NewShim(),
+		//no extractor specified, it default to extract token from "Authorization": Bearer <token>
+		//default jwt parser, the default result is jwt.MapClaims which can be retrieved by middleware.FromContext[jwt.MapClaims](ctx)
+		handler.WithJwtMapClaimsParser([]byte("secret_key")),
+	)
+	//create new middleware
+	authMiddleware, err := middleware.NewAuthMiddleware(middleware.WithHandler(jwtHandler))
+	if err != nil {
+		panic(err)
+	}
+
+	//...
+
+	http.ListenAndServe(
+		"localhost:8080",
+		// Use h2c so we can serve HTTP/2 without TLS.
+		h2c.NewHandler(authMiddleware.Wrap(mux), &http2.Server{}),
+	)
 ```
 
 ## TODO
 
 - tests for cookie
-- e2e test
 - test for kid field
 
 ## refs
